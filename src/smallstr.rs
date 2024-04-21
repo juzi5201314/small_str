@@ -25,6 +25,17 @@ use smallvec::SmallVec;
 pub use smallvec::CollectionAllocErr;
 
 /// like `format!`
+/// 
+/// ```
+/// use small_str::{format_smallstr, SmallString};
+/// # extern crate alloc;
+/// # use alloc::string::String;
+/// 
+/// let foo = "foo";
+/// let bar = String::from("bar");
+/// 
+/// assert_eq!(format_smallstr!("{}{}", foo, bar), SmallString::from("foobar"));
+/// ```
 #[macro_export]
 macro_rules! format_smallstr {
     ($($tt:tt)*) => {{
