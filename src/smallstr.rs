@@ -86,16 +86,6 @@ impl<const N: usize> SmallStr<N> {
     }
 
     #[inline]
-    pub fn vec_ref(&self) -> &SmallVec<u8, N> {
-        &self.vec
-    }
-
-    #[inline]
-    pub unsafe fn vec_mut(&mut self) -> &mut SmallVec<u8, N> {
-        &mut self.vec
-    }
-
-    #[inline]
     pub fn inline_size(&self) -> usize {
         N
     }
@@ -751,6 +741,11 @@ impl<const N: usize> SmallStr<N> {
     #[inline]
     pub unsafe fn as_mut_vec(&mut self) -> &mut SmallVec<u8, N> {
         &mut self.vec
+    }
+
+    #[inline]
+    pub fn as_vec(&self) -> &SmallVec<u8, N> {
+        &self.vec
     }
 
     /// Returns the length of this `SmallStr`, in bytes, not [`char`]s or
