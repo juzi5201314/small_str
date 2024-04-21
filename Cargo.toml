@@ -9,15 +9,15 @@ repository = "https://github.com/juzi5201314/small_str"
 keywords = ["string", "str", "small", "smallvec", "stack", "optimize"]
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"], optional = true }
+serde = { version = "1.0", features = ["derive", "alloc"], default-features = false, optional = true }
 smallvec = { version = "2.0.0-alpha.5" }
 
 [dev-dependencies]
-serde_json = "1.0"
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 
 [features]
 default = ["std"]
 
 serde = ["dep:serde"]
 unstable = []
-std = []
+std = ["serde/std", "serde_json/std"]

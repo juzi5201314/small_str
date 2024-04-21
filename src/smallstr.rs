@@ -1,7 +1,15 @@
+#![allow(unused_imports)]
+
+#[doc(hidden)]
 extern crate alloc;
 
 use alloc::borrow::Cow;
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::str;
 use alloc::str::from_boxed_utf8_unchecked;
+use alloc::string::String;
+use alloc::vec::Vec;
 #[cfg(all(feature = "unstable", not(feature = "std")))]
 use core::error::Error;
 use core::fmt;
@@ -28,7 +36,7 @@ macro_rules! format_smallstr {
 }
 
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(std::mem::size_of::<SmallStr>() == std::mem::size_of::<String>());
+const _: () = assert!(core::mem::size_of::<SmallStr>() == core::mem::size_of::<String>());
 /// `SmallString == SmallStr<16>`, on 64-bit platforms `size_of::<SmallString>()` == `size_of::<String>()`
 pub type SmallString = SmallStr<16>;
 
@@ -83,7 +91,7 @@ impl<const N: usize> SmallStr<N> {
 
     #[inline]
     pub fn from_utf8(vec: SmallVec<u8, N>) -> Result<SmallStr<N>, FromUtf8Error<N>> {
-        match std::str::from_utf8(&vec) {
+        match str::from_utf8(&vec) {
             Ok(..) => Ok(SmallStr { vec }),
             Err(e) => Err(FromUtf8Error {
                 bytes: vec,
@@ -95,7 +103,7 @@ impl<const N: usize> SmallStr<N> {
     #[inline]
     pub fn from_utf8_vec(vec: Vec<u8>) -> Result<SmallStr<N>, FromUtf8Error<N>> {
         let vec = SmallVec::from_vec(vec);
-        match std::str::from_utf8(&vec) {
+        match str::from_utf8(&vec) {
             Ok(..) => Ok(SmallStr { vec }),
             Err(e) => Err(FromUtf8Error {
                 bytes: vec,
@@ -632,7 +640,7 @@ impl<const N: usize> SmallStr<N> {
                 // `guard.del_bytes` >= `ch.len_utf8()`, so taking a slice with `ch.len_utf8()` len
                 // is safe.
                 ch.encode_utf8(unsafe {
-                    std::slice::from_raw_parts_mut(
+                    slice::from_raw_parts_mut(
                         guard.s.as_mut_ptr().add(guard.idx - guard.del_bytes),
                         ch.len_utf8(),
                     )
@@ -1299,14 +1307,14 @@ impl<const N: usize> ops::Deref for SmallStr<N> {
 
     #[inline]
     fn deref(&self) -> &str {
-        unsafe { std::str::from_utf8_unchecked(&self.vec) }
+        unsafe { str::from_utf8_unchecked(&self.vec) }
     }
 }
 
 impl<const N: usize> ops::DerefMut for SmallStr<N> {
     #[inline]
     fn deref_mut(&mut self) -> &mut str {
-        unsafe { std::str::from_utf8_unchecked_mut(&mut *self.vec) }
+        unsafe { str::from_utf8_unchecked_mut(&mut *self.vec) }
     }
 }
 
@@ -1570,92 +1578,88 @@ impl<T: fmt::Display + ?Sized> ToSmallStr for T {
 }
 
 #[cfg(feature = "serde")]
-mod serde {
-    use core::fmt;
+use serde::de::{Error as SerdeError, Unexpected, Visitor};
 
-    use serde::de::{Error, Unexpected, Visitor};
-
-    use crate::SmallStr;
-
-    impl<const N: usize> serde::Serialize for SmallStr<N> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            self.as_str().serialize(serializer)
-        }
+#[cfg(feature = "serde")]
+impl<const N: usize> serde::Serialize for SmallStr<N> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_str().serialize(serializer)
     }
+}
 
-    impl<'de, const N: usize> serde::Deserialize<'de> for SmallStr<N> {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            deserializer.deserialize_str(SmallStrVisitor)
-        }
-    }
+#[cfg(feature = "serde")]
+impl<'de, const N: usize> serde::Deserialize<'de> for SmallStr<N> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct SmallStrVisitor<const N: usize>;
 
-    struct SmallStrVisitor<const N: usize>;
+        impl<'a, const N: usize> Visitor<'a> for SmallStrVisitor<N> {
+            type Value = SmallStr<N>;
 
-    impl<'a, const N: usize> Visitor<'a> for SmallStrVisitor<N> {
-        type Value = SmallStr<N>;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a string")
+            }
 
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a string")
-        }
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: SerdeError,
+            {
+                Ok(SmallStr::from(v))
+            }
 
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: Error,
-        {
-            Ok(SmallStr::from(v))
-        }
+            fn visit_borrowed_str<E>(self, v: &'a str) -> Result<Self::Value, E>
+            where
+                E: SerdeError,
+            {
+                Ok(SmallStr::from(v))
+            }
 
-        fn visit_borrowed_str<E>(self, v: &'a str) -> Result<Self::Value, E>
-        where
-            E: Error,
-        {
-            Ok(SmallStr::from(v))
-        }
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: SerdeError,
+            {
+                Ok(SmallStr::from(v))
+            }
 
-        fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-        where
-            E: Error,
-        {
-            Ok(SmallStr::from(v))
-        }
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: SerdeError,
+            {
+                match core::str::from_utf8(v) {
+                    Ok(s) => Ok(SmallStr::from(s)),
+                    Err(_) => Err(SerdeError::invalid_value(Unexpected::Bytes(v), &self)),
+                }
+            }
 
-        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: Error,
-        {
-            match core::str::from_utf8(v) {
-                Ok(s) => Ok(SmallStr::from(s)),
-                Err(_) => Err(Error::invalid_value(Unexpected::Bytes(v), &self)),
+            fn visit_borrowed_bytes<E>(self, v: &'a [u8]) -> Result<Self::Value, E>
+            where
+                E: SerdeError,
+            {
+                match core::str::from_utf8(v) {
+                    Ok(s) => Ok(SmallStr::from(s)),
+                    Err(_) => Err(SerdeError::invalid_value(Unexpected::Bytes(v), &self)),
+                }
+            }
+
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+            where
+                E: SerdeError,
+            {
+                match String::from_utf8(v) {
+                    Ok(s) => Ok(SmallStr::from(s)),
+                    Err(e) => Err(SerdeError::invalid_value(
+                        Unexpected::Bytes(&e.into_bytes()),
+                        &self,
+                    )),
+                }
             }
         }
 
-        fn visit_borrowed_bytes<E>(self, v: &'a [u8]) -> Result<Self::Value, E>
-        where
-            E: Error,
-        {
-            match core::str::from_utf8(v) {
-                Ok(s) => Ok(SmallStr::from(s)),
-                Err(_) => Err(Error::invalid_value(Unexpected::Bytes(v), &self)),
-            }
-        }
-
-        fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
-        where
-            E: Error,
-        {
-            match String::from_utf8(v) {
-                Ok(s) => Ok(SmallStr::from(s)),
-                Err(e) => Err(Error::invalid_value(
-                    Unexpected::Bytes(&e.into_bytes()),
-                    &self,
-                )),
-            }
-        }
+        deserializer.deserialize_str(SmallStrVisitor)
     }
 }

@@ -18,8 +18,18 @@ fn inline() {
 
 #[cfg(feature = "serde")]
 mod serde_tests {
-    use small_str::SmallString;
+    #![allow(unused_imports)]
+
+    extern crate alloc;
+
+    use alloc::string::String;
+    use alloc::vec::Vec;
     use serde::{Deserialize, Serialize};
+    use small_str::SmallString;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::collections::BTreeMap as HashMap;
+    #[cfg(feature = "std")]
     use std::collections::HashMap;
 
     #[derive(Serialize, Deserialize)]
@@ -39,6 +49,7 @@ mod serde_tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn test_serde_reader() {
         let s = SmallString::from("Hello, World");
         let s = serde_json::to_string(&s).unwrap();
@@ -53,7 +64,10 @@ mod serde_tests {
         map.insert(SmallString::from("a"), SmallString::from("ohno"));
         let struct_ = SmallStrStruct {
             s: SmallString::from("Hello, World"),
-            vec: vec![SmallString::from("Hello, World"), SmallString::from("Hello, World")],
+            vec: vec![
+                SmallString::from("Hello, World"),
+                SmallString::from("Hello, World"),
+            ],
             map,
         };
         let s = serde_json::to_string(&struct_).unwrap();
@@ -61,12 +75,16 @@ mod serde_tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn test_serde_struct_reader() {
         let mut map = HashMap::new();
         map.insert(SmallString::from("a"), SmallString::from("ohno"));
         let struct_ = SmallStrStruct {
             s: SmallString::from("Hello, World"),
-            vec: vec![SmallString::from("Hello, World"), SmallString::from("Hello, World")],
+            vec: vec![
+                SmallString::from("Hello, World"),
+                SmallString::from("Hello, World"),
+            ],
             map,
         };
         let s = serde_json::to_string(&struct_).unwrap();
@@ -82,6 +100,7 @@ mod serde_tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn test_serde_hashmap_reader() {
         let mut map = HashMap::new();
         map.insert(SmallString::from("a"), SmallString::from("ohno"));
@@ -98,6 +117,7 @@ mod serde_tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn test_serde_vec_reader() {
         let vec = vec![SmallString::from(""), SmallString::from("b")];
         let s = serde_json::to_string(&vec).unwrap();
