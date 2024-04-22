@@ -7,7 +7,7 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/juzi5201314/small_str"
 description = "A String-like but using SmallVec internally"
-keywords = ["string", "str", "small", "smallvec", "stack", "optimize"]
+keywords = ["string", "small", "smallvec", "stack", "optimize"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive", "alloc"], default-features = false, optional = true }
