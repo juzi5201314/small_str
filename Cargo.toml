@@ -6,6 +6,7 @@ authors = ["soeur <juzi201314@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/juzi5201314/small_str"
+description = "A String-like but using SmallVec internally"
 keywords = ["string", "str", "small", "smallvec", "stack", "optimize"]
 
 [dependencies]

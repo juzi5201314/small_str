@@ -1,5 +1,8 @@
 # SmallStr
 
+[![Crates.io](https://img.shields.io/crates/v/small_str.svg)](https://crates.io/crates/small_str)
+[![API reference](https://docs.rs/small_str/badge.svg)](https://docs.rs/small_str/)
+
 A `String`-like but using `SmallVec` internally
 
 - `SmallStr<N>` == `SmallVec<u8, N>`
