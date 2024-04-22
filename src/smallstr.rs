@@ -25,15 +25,15 @@ use smallvec::SmallVec;
 pub use smallvec::CollectionAllocErr;
 
 /// like `format!`
-/// 
+///
 /// ```
 /// use small_str::{format_smallstr, SmallString};
 /// # extern crate alloc;
 /// # use alloc::string::String;
-/// 
+///
 /// let foo = "foo";
 /// let bar = String::from("bar");
-/// 
+///
 /// assert_eq!(format_smallstr!("{}{}", foo, bar), SmallString::from("foobar"));
 /// ```
 #[macro_export]
@@ -52,6 +52,7 @@ const _: () = assert!(core::mem::size_of::<SmallStr>() == core::mem::size_of::<S
 pub type SmallString = SmallStr<16>;
 
 #[derive(PartialEq, PartialOrd, Eq, Ord)]
+#[repr(transparent)]
 pub struct SmallStr<const N: usize = 16> {
     vec: SmallVec<u8, N>,
 }
@@ -80,6 +81,13 @@ impl<const N: usize> SmallStr<N> {
         }
     }
 
+    /// Force strings to be allocated on the heap
+    ///
+    #[inline]
+    pub fn force_heap(&mut self) {
+        self.vec.reserve(N + 1);
+    }
+
     #[inline]
     pub fn is_inlined(&self) -> bool {
         !self.vec.spilled()
@@ -90,20 +98,26 @@ impl<const N: usize> SmallStr<N> {
         N
     }
 
+    /// ```
+    /// // some bytes, in a vector
+    /// let sparkle_heart = vec![240, 159, 146, 150];
+    ///
+    /// // We know these bytes are valid, so we'll use `unwrap()`.
+    /// let sparkle_heart = String::from_utf8(sparkle_heart.into()).unwrap();
+    ///
+    /// assert_eq!("💖", sparkle_heart);
+    /// ```
+    ///
+    /// Incorrect bytes:
+    ///
+    /// ```
+    /// // some invalid bytes, in a vector
+    /// let sparkle_heart = vec![0, 159, 146, 150];
+    ///
+    /// assert!(String::from_utf8(sparkle_heart.into()).is_err());
+    /// ```
     #[inline]
     pub fn from_utf8(vec: SmallVec<u8, N>) -> Result<SmallStr<N>, FromUtf8Error<N>> {
-        match str::from_utf8(&vec) {
-            Ok(..) => Ok(SmallStr { vec }),
-            Err(e) => Err(FromUtf8Error {
-                bytes: vec,
-                error: e,
-            }),
-        }
-    }
-
-    #[inline]
-    pub fn from_utf8_vec(vec: Vec<u8>) -> Result<SmallStr<N>, FromUtf8Error<N>> {
-        let vec = SmallVec::from_vec(vec);
         match str::from_utf8(&vec) {
             Ok(..) => Ok(SmallStr { vec }),
             Err(e) => Err(FromUtf8Error {
@@ -132,6 +146,53 @@ impl<const N: usize> SmallStr<N> {
             .collect()
     }
 
+    /// Creates a new `SmallStr` from a pointer, a length and a capacity.
+    ///
+    /// # Safety
+    ///
+    /// This is highly unsafe, due to the number of invariants that aren't
+    /// checked:
+    ///
+    /// * The memory at `buf` needs to have been previously allocated by the
+    ///   same allocator the standard library uses, with a required alignment of exactly 1.
+    /// * `length` needs to be less than or equal to `capacity`.
+    /// * `capacity` needs to be the correct value.
+    /// * The first `length` bytes at `buf` need to be valid UTF-8.
+    ///
+    /// Violating these may cause problems like corrupting the allocator's
+    /// internal data structures. For example, it is normally **not** safe to
+    /// build a `SmallStr` from a pointer to a C `char` array containing UTF-8
+    /// _unless_ you are certain that array was originally allocated by the
+    /// Rust standard library's allocator.
+    ///
+    /// The ownership of `buf` is effectively transferred to the
+    /// `SmallStr` which may then deallocate, reallocate or change the
+    /// contents of memory pointed to by the pointer at will. Ensure
+    /// that nothing else uses the pointer after calling this
+    /// function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::mem;
+    /// use small_str::SmallString;
+    ///
+    /// unsafe {
+    ///     let mut s = SmallString::from("hello");
+    ///     s.force_heap();
+    ///
+    ///     // Prevent automatically dropping the String's data
+    ///     let mut s = mem::ManuallyDrop::new(s);
+    ///
+    ///     let ptr = s.as_mut_ptr();
+    ///     let len = s.len();
+    ///     let capacity = s.capacity();
+    ///
+    ///     let s = SmallString::from_raw_parts(ptr, len, capacity);
+    ///
+    ///     assert_eq!(SmallString::from("hello"), s);
+    /// }
+    /// ```
     #[inline]
     pub unsafe fn from_raw_parts(buf: *mut u8, length: usize, capacity: usize) -> SmallStr<N> {
         unsafe {
@@ -141,6 +202,38 @@ impl<const N: usize> SmallStr<N> {
         }
     }
 
+    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+        self.vec.as_mut_ptr()
+    }
+
+    /// Converts a vector of bytes to a `SmallStr` without checking that the
+    /// string contains valid UTF-8.
+    ///
+    /// See the safe version, [`from_utf8`], for more details.
+    ///
+    /// [`from_utf8`]: SmallStr::from_utf8
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because it does not check that the bytes passed
+    /// to it are valid UTF-8. If this constraint is violated, it may cause
+    /// memory unsafety issues with future users of the `String`, as the rest of
+    /// the standard library assumes that `String`s are valid UTF-8.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use small_str::SmallString;
+    /// 
+    /// // some bytes, in a vector
+    /// let sparkle_heart = vec![240, 159, 146, 150];
+    ///
+    /// let sparkle_heart = unsafe {
+    ///     SmallString::from_utf8_unchecked(sparkle_heart.into())
+    /// };
+    ///
+    /// assert_eq!("💖", sparkle_heart);
+    /// ```
     #[inline]
     pub unsafe fn from_utf8_unchecked(bytes: SmallVec<u8, N>) -> SmallStr<N> {
         SmallStr { vec: bytes }
@@ -905,7 +998,7 @@ impl<const N: usize> FromUtf8Error<N> {
     /// // some invalid bytes, in a vector
     /// let bytes = vec![0, 159];
     ///
-    /// let value = SmallString::from_utf8_vec(bytes);
+    /// let value = SmallString::from_utf8(bytes.into());
     ///
     /// assert_eq!(&[0, 159], value.unwrap_err().as_bytes());
     /// ```
@@ -927,7 +1020,7 @@ impl<const N: usize> FromUtf8Error<N> {
     /// // some invalid bytes, in a vector
     /// let bytes = vec![0, 159];
     ///
-    /// let value = SmallString::from_utf8_vec(bytes);
+    /// let value = SmallString::from_utf8(bytes.into());
     ///
     /// assert_eq!(vec![0, 159], value.unwrap_err().into_bytes().into_vec());
     /// ```
@@ -953,7 +1046,7 @@ impl<const N: usize> FromUtf8Error<N> {
     /// // some invalid bytes, in a vector
     /// let bytes = vec![0, 159];
     ///
-    /// let error = SmallString::from_utf8_vec(bytes).unwrap_err().utf8_error();
+    /// let error = SmallString::from_utf8(bytes.into()).unwrap_err().utf8_error();
     ///
     /// // the first byte is invalid here
     /// assert_eq!(1, error.valid_up_to());
