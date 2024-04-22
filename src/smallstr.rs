@@ -224,7 +224,7 @@ impl<const N: usize> SmallStr<N> {
     ///
     /// ```
     /// use small_str::SmallString;
-    /// 
+    ///
     /// // some bytes, in a vector
     /// let sparkle_heart = vec![240, 159, 146, 150];
     ///
@@ -619,7 +619,7 @@ impl<const N: usize> SmallStr<N> {
     /// `newlen <= self.len()`
     #[inline]
     pub fn pop(&mut self) -> Option<char> {
-        let ch = self.chars().rev().next()?;
+        let ch = self.chars().next_back()?;
         let newlen = self.len() - ch.len_utf8();
         unsafe {
             self.vec.set_len(newlen);
@@ -1239,22 +1239,14 @@ impl<'a, const N: usize> Extend<Cow<'a, str>> for SmallStr<N> {
 impl<const N: usize> PartialEq<str> for SmallStr<N> {
     #[inline]
     fn eq(&self, other: &str) -> bool {
-        PartialEq::eq(self.as_str(), &other[..])
-    }
-    #[inline]
-    fn ne(&self, other: &str) -> bool {
-        PartialEq::ne(self.as_str(), &other[..])
+        PartialEq::eq(self.as_str(), other)
     }
 }
 
 impl<const N: usize> PartialEq<SmallStr<N>> for str {
     #[inline]
     fn eq(&self, other: &SmallStr<N>) -> bool {
-        PartialEq::eq(&self[..], other.as_str())
-    }
-    #[inline]
-    fn ne(&self, other: &SmallStr<N>) -> bool {
-        PartialEq::ne(&self[..], other.as_str())
+        PartialEq::eq(self, other.as_str())
     }
 }
 
@@ -1263,20 +1255,12 @@ impl<'a, const N: usize> PartialEq<&'a str> for SmallStr<N> {
     fn eq(&self, other: &&'a str) -> bool {
         PartialEq::eq(self.as_str(), &other[..])
     }
-    #[inline]
-    fn ne(&self, other: &&'a str) -> bool {
-        PartialEq::ne(self.as_str(), &other[..])
-    }
 }
 
 impl<'a, const N: usize> PartialEq<SmallStr<N>> for &'a str {
     #[inline]
     fn eq(&self, other: &SmallStr<N>) -> bool {
         PartialEq::eq(&self[..], other.as_str())
-    }
-    #[inline]
-    fn ne(&self, other: &SmallStr<N>) -> bool {
-        PartialEq::ne(&self[..], other.as_str())
     }
 }
 
@@ -1285,10 +1269,6 @@ impl<'a, const N: usize> PartialEq<SmallStr<N>> for Cow<'a, str> {
     fn eq(&self, other: &SmallStr<N>) -> bool {
         PartialEq::eq(&self[..], other.as_str())
     }
-    #[inline]
-    fn ne(&self, other: &SmallStr<N>) -> bool {
-        PartialEq::ne(&self[..], other.as_str())
-    }
 }
 
 impl<'a, const N: usize> PartialEq<Cow<'a, str>> for SmallStr<N> {
@@ -1296,31 +1276,19 @@ impl<'a, const N: usize> PartialEq<Cow<'a, str>> for SmallStr<N> {
     fn eq(&self, other: &Cow<'a, str>) -> bool {
         PartialEq::eq(self.as_str(), &other[..])
     }
-    #[inline]
-    fn ne(&self, other: &Cow<'a, str>) -> bool {
-        PartialEq::ne(self.as_str(), &other[..])
-    }
 }
 
-impl<'a, const N: usize> PartialEq<SmallStr<N>> for String {
+impl<const N: usize> PartialEq<SmallStr<N>> for String {
     #[inline]
     fn eq(&self, other: &SmallStr<N>) -> bool {
         PartialEq::eq(&self[..], other.as_str())
     }
-    #[inline]
-    fn ne(&self, other: &SmallStr<N>) -> bool {
-        PartialEq::ne(&self[..], other.as_str())
-    }
 }
 
-impl<'a, const N: usize> PartialEq<String> for SmallStr<N> {
+impl<const N: usize> PartialEq<String> for SmallStr<N> {
     #[inline]
     fn eq(&self, other: &String) -> bool {
         PartialEq::eq(self.as_str(), &other[..])
-    }
-    #[inline]
-    fn ne(&self, other: &String) -> bool {
-        PartialEq::ne(self.as_str(), &other[..])
     }
 }
 
@@ -1413,7 +1381,7 @@ impl<const N: usize> ops::Deref for SmallStr<N> {
 impl<const N: usize> ops::DerefMut for SmallStr<N> {
     #[inline]
     fn deref_mut(&mut self) -> &mut str {
-        unsafe { str::from_utf8_unchecked_mut(&mut *self.vec) }
+        unsafe { str::from_utf8_unchecked_mut(&mut self.vec) }
     }
 }
 
